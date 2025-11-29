@@ -65,6 +65,37 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
     []
   );
 
+  // refs to the per-image note textareas so we can auto-resize them when content changes
+  const noteRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
+
+  const handleNoteChange = (slot: number, e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setImageNotes((prev) => {
+      const copy = [...(prev || [])];
+      while (copy.length < 6) copy.push('');
+      copy[slot] = value;
+      return copy;
+    });
+    // adjust height for this textarea immediately
+    try {
+      const ta = e.target as HTMLTextAreaElement;
+      ta.style.height = 'auto';
+      ta.style.height = ta.scrollHeight + 'px';
+    } catch (err) {}
+  };
+
+  // ensure textareas resize appropriately when notes or images change (e.g., after TTS/AI fill)
+  useEffect(() => {
+    for (let i = 0; i < 6; i++) {
+      const ta = noteRefs.current[i];
+      if (!ta) continue;
+      try {
+        ta.style.height = 'auto';
+        ta.style.height = ta.scrollHeight + 'px';
+      } catch (err) {}
+    }
+  }, [imageNotes, images]);
+
   useEffect(() => {
     if (procedure) {
       setPatientName(procedure.patientName || "");
@@ -84,12 +115,12 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
   setIndications((procedure as any).indication || procedure.indication || "");
   setAge((procedure as any).age || procedure.age || "");
   setGender((procedure as any).sex || procedure.sex || "");
-      // If the navigation provided selectedImages, use those; otherwise try persisted selection in localStorage,
-      // otherwise fallback to procedure.images. Use the persisted QC selection as-is (no extra image).
+      // If the navigation provided selectedImages, use those. If not, try reading a persisted
+      // selection from localStorage (saved by ProceduresList). We only load from storage when
+      // there is a non-empty persisted selection to avoid auto-filling when no selection exists.
       const state = (location as any).state as any;
       const selectedImages = state?.selectedImages as string[] | undefined;
-
-      if (selectedImages && selectedImages.length) {
+      if (selectedImages && Array.isArray(selectedImages) && selectedImages.length > 0) {
         setImages(selectedImages.map((src) => ({ src })) as any);
         return;
       }
@@ -100,29 +131,61 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
         const stored = localStorage.getItem(storageKey);
         if (stored) {
           const parsed = JSON.parse(stored) as string[];
-          if (Array.isArray(parsed) && parsed.length) {
-            setImages(parsed.map((src) => ({ src })) as any);
-            return;
+          // only accept a persisted selection if it's a non-empty array and its entries are
+          // actual images for this procedure (defensive check)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const valid = parsed.every((p) => (procedure.images || []).includes(p));
+            if (valid) {
+              setImages(parsed.map((src) => ({ src })) as any);
+              return;
+            }
           }
         }
       } catch (err) {
-        // ignore parse errors and fall back to procedure.images
+        // ignore parse errors
       }
 
-      if (procedure.images && procedure.images.length) {
-        setImages(procedure.images.map((src) => ({ src })) as any);
-      }
+      // otherwise leave images empty (no images selected)
+      setImages([]);
     }
   }, [procedure]);
 
   // initialize per-image notes array whenever images change (keep existing notes where possible)
+  // Prefer notes attached to the procedure (loaded from JSON at insertion time) when available.
   useEffect(() => {
+    // initialize notes to empty strings for selected images; do NOT prefill from JSON here.
     const count = 6;
-    setImageNotes((prev) => {
-      const next = Array.from({ length: count }).map((_, i) => (prev && prev[i]) ? prev[i] : '');
+    setImageNotes(() => {
+      const next = Array.from({ length: count }).map((_, i) => {
+        // if an image is present for this slot, leave its note blank; otherwise blank too
+        return '';
+      });
       return next;
     });
   }, [images]);
+
+  // Helper: generate a short 1-3 word label for an image (heuristic)
+  const generateShortLabel = (src?: string, idx?: number) => {
+    if (!src) return '';
+    const s = src.toString().toLowerCase();
+    if (s.includes('polyp') || s.includes('polypect')) return 'Polyp';
+    if (s.includes('divert') || s.includes('meckel')) return 'Diverticulum';
+    if (s.includes('bleed') || s.includes('blood')) return 'Bleeding';
+    if (s.includes('clip')) return 'Clip';
+    if (s.includes('nbi')) return 'NBI view';
+    if (s.includes('wl') || s.includes('white')) return 'White-light view';
+    if (s.includes('img')) return 'Overview';
+    const fallbacks = ['Mucosa', 'Lesion', 'Instrument', 'Polyp'];
+    return fallbacks[((idx || 1) - 1) % fallbacks.length];
+  };
+
+  // Helper: generate a fitting descriptive sentence for an image
+  const generateFittingDescription = (src?: string, idx?: number, label?: string) => {
+    const short = label || generateShortLabel(src, idx);
+    if (!short) return '';
+    const base = short.toLowerCase();
+    return `${short}. Representative endoscopic image showing ${base}.`;
+  };
 
   const handleDownload = async () => {
     const el = reportRef.current;
@@ -191,43 +254,148 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
         <textarea style={styles.textareaXL} value={findings} onChange={(e) => setFindings(e.target.value)} />
 
         <div style={{ marginTop: 12 }}>
-          {/* colon image above the image grid */}
-          <div style={{ marginBottom: 8 }}>
-            <img src="/colon.png" alt="colon" style={{ width: 120 }} />
+          {/* colon image and action buttons above the image grid */}
+          <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <img src="/colon.png" alt="colon" style={{ width: 120 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => {
+                  // TTS-like auto-fill: prefer descriptions from the procedure's imageNotes map (if present).
+                  // imageNotes in the procedure is a mapping of filename (or key) -> description.
+                  setImageNotes((prev) => {
+                    const next = Array.from({ length: 6 }).map((_, i) => (prev && prev[i]) ? prev[i] : '');
+                    for (let i = 0; i < 6; i++) {
+                      const img = images && images[i];
+                      if (!img) continue; // only fill descriptions for actual images
+
+                      // attempt to look up a description from procedure.imageNotes (mapping)
+                      let found = '';
+                      try {
+                        const map = (procedure as any)?.imageNotes as Record<string, string> | undefined;
+                        if (map) {
+                          const src = img.src || '';
+                          const parts = src.split('/');
+                          const basename = parts.pop() || src;
+                          const nameNoExt = basename.split('.')?.[0] || basename;
+                          // try multiple key formats (exact basename, lowercase, without extension)
+                          const tries = [basename, basename.toLowerCase(), nameNoExt, nameNoExt.toLowerCase()];
+                          for (const k of tries) {
+                            if (map[k]) {
+                              found = map[k];
+                              break;
+                            }
+                          }
+                          // final attempt: any key that is contained in the src string
+                          if (!found) {
+                            for (const key of Object.keys(map)) {
+                              if (!key) continue;
+                              if (src.toLowerCase().includes(key.toLowerCase())) {
+                                found = map[key];
+                                break;
+                              }
+                            }
+                          }
+                        }
+                      } catch (e) {
+                        // ignore
+                      }
+
+                      if (found) {
+                        next[i] = found;
+                        continue;
+                      }
+
+                      // fallback to heuristic generation
+                      const label = generateShortLabel(img?.src, i + 1);
+                      next[i] = generateFittingDescription(img?.src, i + 1, label);
+                    }
+                    return next;
+                  });
+                }}
+                title="Auto-generate descriptions"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 16px', minWidth: 140, justifyContent: 'center', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer' }}
+              >
+                <img src="/tts.png" alt="tts" style={{ width: 20, height: 20 }} />
+              </button>
+
+              <button
+                onClick={() => {
+                  // AI image annotator: prepend a short 1-3 word classification to each selected image note
+                  setImageNotes((prev) => {
+                    const next = Array.from({ length: 6 }).map((_, i) => (prev && prev[i]) ? prev[i] : '');
+                    for (let i = 0; i < 6; i++) {
+                      const img = images && images[i];
+                      if (!img) continue; // only annotate actual images
+                      const label = generateShortLabel(img?.src, i + 1);
+                      if (!label) continue;
+                      const existing = next[i] || '';
+                      // avoid duplicate prepends
+                      if (existing.toLowerCase().startsWith(label.toLowerCase())) continue;
+                      next[i] = `${label}${existing ? ': ' + existing : ''}`;
+                    }
+                    return next;
+                  });
+                }}
+                title="AI image annotator"
+                style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#f3f4f6', cursor: 'pointer', fontSize: 13 }}
+              >
+                AI image annotator
+              </button>
+            </div>
           </div>
 
-          {/* 3x2 grid where each slot shows an image and its own note underneath */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            {Array.from({ length: 6 }).map((_, slot) => {
+          {/* 3x2 grid where each rendered slot shows an image and its own note underneath.
+              We only render slots that have either an image or a non-empty note. */}
+          {(() => {
+            const slots = Array.from({ length: 6 }).map((_, i) => i);
+            const visible = slots.filter((slot) => {
               const img = images && images[slot];
-              const isPlaceholder = !img;
-              return (
-                <div key={slot} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ width: '100%', overflow: 'hidden', borderRadius: 6, border: isPlaceholder ? '1px dashed #e5e7eb' : '1px solid #e5e7eb', position: 'relative', height: 120, background: '#fff' }}>
-                    {/* numbered badge top-left */}
-                    <div style={{ position: 'absolute', top: 6, left: 6, zIndex: 10, background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', padding: '2px 6px', borderRadius: 6, fontSize: 12, fontWeight: 700, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>{slot + 1}</div>
-                    {img ? (
-                      <img src={img.src} alt={`img-${slot}`} style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block', background: '#fff' }} />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>no image</div>
-                    )}
-                  </div>
+              const note = (imageNotes && imageNotes[slot]) || '';
+              return !!img || (note && note.trim().length > 0);
+            });
 
-                  <textarea
-                    value={imageNotes[slot] || ''}
-                    onChange={(e) => setImageNotes((prev) => {
-                      const copy = [...(prev || [])];
-                      while (copy.length < 6) copy.push('');
-                      copy[slot] = e.target.value;
-                      return copy;
-                    })}
-                    style={{ width: '100%', minHeight: 64, padding: 8, borderRadius: 6, border: '1px solid #e5e7eb', resize: 'vertical', fontSize: 13 }}
-                    placeholder={`Notes for image ${slot + 1}`}
-                  />
-                </div>
-              );
-            })}
-          </div>
+            if (visible.length === 0) {
+              return <div style={{ color: '#6b7280' }}>No images or notes to display.</div>;
+            }
+
+            const cols = Math.min(3, visible.length) || 1;
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 12 }}>
+                {visible.map((slot) => {
+                  const img = images && images[slot];
+                  const isPlaceholder = !img;
+                  return (
+                    <div key={slot} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ width: '100%', overflow: 'hidden', borderRadius: 6, border: isPlaceholder ? '1px dashed #e5e7eb' : '1px solid #e5e7eb', position: 'relative', height: 120, background: '#fff' }}>
+                        {/* numbered badge top-left */}
+                        <div style={{ position: 'absolute', top: 6, left: 6, zIndex: 10, background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', padding: '2px 6px', borderRadius: 6, fontSize: 12, fontWeight: 700, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>{slot + 1}</div>
+                        {img ? (
+                          <img src={img.src} alt={`img-${slot}`} style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block', background: '#fff' }} />
+                        ) : (
+                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>no image</div>
+                        )}
+                      </div>
+
+                      <textarea
+                        ref={(el) => (noteRefs.current[slot] = el)}
+                        value={imageNotes[slot] || ''}
+                        onChange={(e) => handleNoteChange(slot, e)}
+                        onInput={(e) => {
+                          const ta = e.currentTarget as HTMLTextAreaElement;
+                          ta.style.height = 'auto';
+                          ta.style.height = ta.scrollHeight + 'px';
+                        }}
+                        style={{ width: '100%', minHeight: 40, padding: 8, borderRadius: 6, border: '1px solid #e5e7eb', resize: 'none', overflow: 'hidden', fontSize: 13 }}
+                        placeholder={`Notes for image ${slot + 1}`}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         <h3 style={styles.sectionHeader}>Diagnosis</h3>

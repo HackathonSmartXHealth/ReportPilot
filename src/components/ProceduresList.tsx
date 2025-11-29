@@ -44,14 +44,7 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
             if (Array.isArray(arr)) {
               // convert to boolean flags corresponding to proc.images
               const flags = (proc.images || []).map((img) => arr.includes(img));
-              // ensure always-selected images remain included
-              const alwaysList = ['img1.png', 'img2.png', 'img3.png'];
-              for (let i = 0; i < (proc.images || []).length; i++) {
-                try {
-                  const basename = (proc.images || [])[i]?.toString().split('/').pop()?.toLowerCase();
-                  if (basename && alwaysList.includes(basename)) flags[i] = true;
-                } catch (e) {}
-              }
+              // convert to boolean flags corresponding to proc.images
               map[proc.id] = flags;
             }
           } catch {}
@@ -109,9 +102,28 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
               className="p-4 hover:shadow-lg transition-all cursor-pointer hover:border-primary/50 relative group"
               onClick={(e) => {
                 if (!(e.target as HTMLElement).closest('button')) {
-                  // compute selected images for this procedure (default: include all)
-                  const selectedFlags = selectedMap[procedure.id] || procedure.images?.map(() => true) || [];
-                  const selectedImages = (procedure.images || []).filter((src, i) => selectedFlags[i]);
+                  // compute selected images for this procedure. Prefer the in-memory selectedMap
+                  // but fall back to the persisted selection in localStorage if needed. This
+                  // avoids a race where a recent selection (QC or toggles) hasn't yet flushed
+                  // into React state when the user immediately opens the ReportEditor.
+                  let selectedFlags = selectedMap[procedure.id];
+                  // If we don't have an in-memory selection, try reading the persisted list
+                  if (!selectedFlags) {
+                    try {
+                      const stored = localStorage.getItem(`selectedImages_${procedure.id}`);
+                      if (stored) {
+                        const parsed = JSON.parse(stored) as string[];
+                        if (Array.isArray(parsed)) {
+                          selectedFlags = (procedure.images || []).map((img) => parsed.includes(img));
+                        }
+                      }
+                    } catch (err) {
+                      // ignore parse errors
+                    }
+                  }
+                  // default to all-false if still undefined
+                  if (!selectedFlags) selectedFlags = procedure.images?.map(() => false) || [];
+                  const selectedImages = (procedure.images || []).filter((src, i) => selectedFlags![i]);
                   onCreateReport(procedure, selectedImages);
                 }
               }}
@@ -175,30 +187,24 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
                         {procedure.images.map((img, idx) => {
                           const status = qcMap[procedure.id]?.[idx];
                           const hasQc = (qcMap[procedure.id] || []).length > 0;
-                          // always-selected images (force good and included)
-                          const alwaysList = ['img1.png', 'img2.png', 'img3.png'];
-                          let isAlwaysSelected = false;
-                          try {
-                            const basename = img?.toString().split('/').pop()?.toLowerCase();
-                            if (basename && alwaysList.includes(basename)) isAlwaysSelected = true;
-                          } catch (e) { isAlwaysSelected = false; }
-                          const effectiveStatus = isAlwaysSelected ? 'good' : status;
-                          const effectiveHasQc = hasQc || isAlwaysSelected;
-                          const color = effectiveStatus === 'good' ? '#16a34a' : effectiveStatus === 'warn' ? '#f59e0b' : effectiveStatus === 'bad' ? '#dc2626' : 'var(--border)';
-                          const borderWidth = effectiveHasQc && effectiveStatus ? 4 : effectiveStatus ? 2 : 1;
+                          const color = status === 'good' ? '#16a34a' : status === 'warn' ? '#f59e0b' : status === 'bad' ? '#dc2626' : 'var(--border)';
+                          const borderWidth = hasQc && status ? 4 : status ? 2 : 1;
                           // selection state: default true (included) unless QC ran, then default to status==='good'
                           const selectedList = selectedMap[procedure.id];
-                          const selectedDefault = effectiveHasQc ? (effectiveStatus === 'good') : true;
-                          // force always-selected to be true
-                          const selected = isAlwaysSelected ? true : (selectedList ? !!selectedList[idx] : selectedDefault);
-                          const dimmed = !selected;
+                          // default selection: if QC ran, include 'good' images; otherwise no images are included initially
+                          const selectedDefault = hasQc ? (status === 'good') : false;
+                          const selected = selectedList ? !!selectedList[idx] : selectedDefault;
+                          // visual dimming: only gray-out images if QC ran or user has an explicit saved selection;
+                          // at initial app start (no QC, no saved selection) images remain visible (not grayed)
+                          let dimmed = false;
+                          if (hasQc) dimmed = !selected;
+                          else if (selectedList) dimmed = !selected;
+                          else dimmed = false;
 
                           const toggleSelect = (e: any) => {
                             e.stopPropagation();
-                            // do not allow toggling of always-selected images
-                            if (isAlwaysSelected) return;
                             setSelectedMap((s) => {
-                              const cur = s[procedure.id] ? [...s[procedure.id]] : procedure.images.map(() => true);
+                              const cur = s[procedure.id] ? [...s[procedure.id]] : procedure.images.map(() => false);
                               cur[idx] = !cur[idx];
                               // persist updated selection immediately
                               try {
@@ -252,44 +258,60 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
                       // are chosen each time QC runs for the same procedure.
                       const imgs = procedure.images || [];
                       const n = imgs.length;
+                      // total 'good' images we want from QC (including any always-included images)
                       const want = Math.min(5, n);
 
-                      // simple hash from procedure.id -> number
+                      // simple hash from procedure.id -> number for deterministic picks
                       let hash = 0;
                       for (let i = 0; i < (procedure.id || '').length; i++) {
                         hash = (hash * 31 + (procedure.id || '').charCodeAt(i)) >>> 0;
                       }
 
+                      const alwaysList = ['img1', 'img2', 'img3'];
                       const selectedIndices = new Set<number>();
+
+                      // include any always-listed images first (match basename without extension)
+                      for (let i = 0; i < imgs.length; i++) {
+                        try {
+                          const basename = imgs[i]?.toString().split('/').pop()?.toLowerCase();
+                          const nameNoExt = basename?.split('.')?.[0];
+                          if (nameNoExt && alwaysList.includes(nameNoExt)) selectedIndices.add(i);
+                        } catch (e) {}
+                      }
+
+                      // then add deterministic picks until we reach 'want'
                       let k = 0;
-                      // step uses a small prime to distribute picks
                       const step = 7;
-                      while (selectedIndices.size < want && n > 0 && k < n * 2) {
+                      while (selectedIndices.size < want && n > 0 && k < n * 3) {
                         const idx = (hash + k * step) % n;
                         selectedIndices.add(idx);
                         k++;
                       }
 
-                      let statuses: Array<'good'|'warn'|'bad'> = imgs.map((_, i) => (selectedIndices.has(i) ? 'good' : 'warn'));
-                      // force any always-selected images to be 'good'
-                      const alwaysList = ['img1.png', 'img2.png', 'img3.png'];
-                      for (let i = 0; i < imgs.length; i++) {
-                        try {
-                          const basename = imgs[i]?.toString().split('/').pop()?.toLowerCase();
-                          if (basename && alwaysList.includes(basename)) statuses[i] = 'good';
-                        } catch (e) {}
+                      // pick up to 2 'bad' images (red) deterministically from remaining images
+                      const badIndices = new Set<number>();
+                      const maxBad = Math.min(2, Math.max(0, n - selectedIndices.size));
+                      let hash2 = (hash ^ 0x9e3779b1) >>> 0;
+                      let k2 = 0;
+                      const step2 = 11;
+                      while (badIndices.size < maxBad && k2 < n * 3) {
+                        const idx = (hash2 + k2 * step2) % n;
+                        if (!selectedIndices.has(idx)) badIndices.add(idx);
+                        k2++;
                       }
+
+                      const statuses: Array<'good'|'warn'|'bad'> = imgs.map((_, i) => {
+                        if (selectedIndices.has(i)) return 'good';
+                        if (badIndices.has(i)) return 'bad';
+                        return 'warn';
+                      });
+
                       setQcMap((s) => ({ ...s, [procedure.id]: statuses }));
+
                       // initialize selection: include only 'good' images by default after QC
                       const selected = statuses.map((st) => st === 'good');
-                      // ensure always-selected remain true
-                      for (let i = 0; i < imgs.length; i++) {
-                        try {
-                          const basename = imgs[i]?.toString().split('/').pop()?.toLowerCase();
-                          if (basename && alwaysList.includes(basename)) selected[i] = true;
-                        } catch (e) {}
-                      }
                       setSelectedMap((s) => ({ ...s, [procedure.id]: selected }));
+
                       // persist to localStorage (no download)
                       try {
                         saveSelectedToStorage(procedure.id, selected, procedure.images || []);
@@ -298,11 +320,21 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
                     Quality control
                   </Button>
                     <Button size="sm" variant="outline" className="mr-2" onClick={(e) => { e.stopPropagation();
-                        // Reset selection: mark all images as included (not grayed out)
-                        const all = (procedure.images || []).map(() => true);
-                        setSelectedMap((s) => ({ ...s, [procedure.id]: all }));
-                        try { saveSelectedToStorage(procedure.id, all, procedure.images || []); } catch {}
-                      }} onMouseDown={(e)=>e.stopPropagation()} title="Reset selection (include all images)">
+                        // Reset selection: clear all selections (no images included)
+                        // remove in-memory selection so the UI doesn't treat a false-array as an explicit selection
+                        setSelectedMap((s) => {
+                          const copy = { ...s };
+                          delete copy[procedure.id];
+                          return copy;
+                        });
+                        try {
+                          // remove persisted selection so the report won't auto-include images
+                          localStorage.removeItem(`selectedImages_${procedure.id}`);
+                        } catch (err) {
+                          // fallback: save an explicit empty selection array
+                          try { saveSelectedToStorage(procedure.id, (procedure.images || []).map(() => false), procedure.images || []); } catch {}
+                        }
+                      }} onMouseDown={(e)=>e.stopPropagation()} title="Reset selection (clear all)">
                       Reset selection
                     </Button>
                   

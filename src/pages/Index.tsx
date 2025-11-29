@@ -13,6 +13,7 @@ import WL4 from "@/assets/WL4.png";
 import IMG1 from "@/assets/IMG1.jpg";
 import IMG2 from "@/assets/IMG2.jpg";
 import IMG3 from "@/assets/IMG3.jpg";
+import imageNotes2 from "@/assets/image_notes_2.json";
 import WL50 from "@/assets/WL_50.png";
 import WL51 from "@/assets/WL_51.png";
 import WL52 from "@/assets/WL_52.png";
@@ -54,6 +55,7 @@ export interface Procedure {
   complications?: string;
   duration: string;
   anesthesia: string;
+  imageNotes?: Record<string, string>;
   images?: string[];
 }
 
@@ -103,6 +105,8 @@ const Index = () => {
   anesthesia: "Conscious Sedation",
   recommendations: "Polyp retrieved and sent for histologic analysis. Recommend surgical consultation regarding Meckel diverticulum given ongoing bleeding risk; consider cross-sectional imaging (CT enterography) if bleeding recurs. Initiate iron supplementation and outpatient follow-up in 2 weeks.",
   images: [IMG1, IMG2, IMG3, WL3, WL4, WL55, WL56, WL57, WL58, WL59, WL65, WL66, WL67, WL68, WL69]
+  ,
+  imageNotes: imageNotes2
     }
   ]);
 
