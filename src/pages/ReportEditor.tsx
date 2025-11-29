@@ -52,6 +52,7 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
   const [indications, setIndications] = useState("");
   const [medications, setMedications] = useState("");
   const [complications, setComplications] = useState("");
+  const [extentOfExam, setExtentOfExam] = useState("");
 
   const [description, setDescription] = useState("");
   const [findings, setFindings] = useState("");
@@ -69,6 +70,7 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
       if (procedure.date) setProcedureDateTime(new Date(procedure.date).toLocaleString());
       setPhysician(procedure.surgeon || "");
       setExamType(procedure.procedureType || "");
+      setExtentOfExam((procedure as any).extent || (procedure as any).extentOfExam || "Cecum");
       setFindings(procedure.findings || "");
       setComplications(procedure.complications || "");
       if (procedure.images && procedure.images.length) {
@@ -100,92 +102,77 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
       </div>
 
       <div ref={reportRef} style={styles.page}>
-        <div style={styles.headerRow}>
-          <div style={styles.logoPlaceholder}>LOGO</div>
-          <div style={{ flex: 1 }} />
+        <div style={{ textAlign: "left", marginBottom: 8 }}>
+          <img src="/report_header.png" alt="report header" style={{ width: "100%", maxWidth: 760 }} />
         </div>
 
-        <section style={styles.sectionRow}>
-          <div style={styles.twoColumn}>
-            <label style={styles.label}>Patient Name</label>
-            <input style={styles.input} value={patientName} onChange={(e) => setPatientName(e.target.value)} />
+        <h2 style={{ textAlign: "center", fontSize: 20, fontWeight: 700, margin: "12px 0" }}>Colonoscopy Procedure Report</h2>
 
-            <label style={styles.label}>Date of Birth</label>
-            <input style={styles.input} value={dob} onChange={(e) => setDob(e.target.value)} />
-
-            <div style={{ display: "flex", gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <label style={styles.label}>Gender</label>
-                <input style={styles.input} value={gender} onChange={(e) => setGender(e.target.value)} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={styles.label}>Age</label>
-                <input style={styles.input} value={age} onChange={(e) => setAge(e.target.value)} />
-              </div>
-            </div>
-
-            <label style={styles.label}>Patient ID</label>
-            <input style={styles.input} value={patientId} onChange={(e) => setPatientId(e.target.value)} />
-
-            <label style={styles.label}>Date / Time of Procedure</label>
-            <input style={styles.input} value={procedureDateTime} onChange={(e) => setProcedureDateTime(e.target.value)} />
+        <div style={styles.detailTable}>
+          <div style={styles.tableLeft}>
+            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>ID number:</strong></div><div style={styles.tableValue}>{patientId || ""}</div></div>
+            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Patient Name:</strong></div><div style={styles.tableValue}>{patientName || ""}</div></div>
+            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Record Number:</strong></div><div style={styles.tableValue}>{patientId || ""}</div></div>
+            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Date of Birth:</strong></div><div style={styles.tableValue}>{dob || ""}</div></div>
+            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Sex:</strong></div><div style={styles.tableValue}>{gender || ""}</div></div>
           </div>
-
-          <div style={styles.twoColumn}>
-            <label style={styles.label}>Physician</label>
-            <input style={styles.input} value={physician} onChange={(e) => setPhysician(e.target.value)} />
-
-            <label style={styles.label}>Exam / Procedure Type</label>
-            <input style={styles.input} value={examType} onChange={(e) => setExamType(e.target.value)} />
-
-            <label style={styles.label}>Indications</label>
-            <textarea style={styles.textareaLarge} value={indications} onChange={(e) => setIndications(e.target.value)} />
-
-            <label style={styles.label}>Medications</label>
-            <textarea style={styles.textareaLarge} value={medications} onChange={(e) => setMedications(e.target.value)} />
-
-            <label style={styles.label}>Complications</label>
-            <textarea style={styles.textareaLarge} value={complications} onChange={(e) => setComplications(e.target.value)} />
+          <div style={styles.tableRight}>
+            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Date/Time:</strong></div><div style={styles.tableValue}>{procedureDateTime || ""}</div></div>
+            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Patient Type:</strong></div><div style={styles.tableValue}>Outpatient</div></div>
+            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Physician:</strong></div><div style={styles.tableValue}>{physician || ""}</div></div>
+            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Referring Physician:</strong></div><div style={styles.tableValue}> </div></div>
           </div>
-        </section>
+        </div>
 
-        <section style={{ ...styles.sectionRow, marginTop: 18 }}>
-          <div style={{ flex: 1 }}>
-            <h3 style={styles.sectionHeader}>Procedure Description</h3>
-            <textarea style={styles.textareaXL} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <h3 style={styles.sectionHeader}>A. Procedure Information</h3>
+        <div style={{ marginBottom: 8 }}><strong>Procedure Performed:</strong> {examType || "Colonoscopy"}</div>
 
-            <div style={styles.subtabs}>
-              <div style={styles.subtab}>
-                <h4 style={styles.subtabHeader}>Findings</h4>
-                <textarea style={styles.textarea} value={findings} onChange={(e) => setFindings(e.target.value)} />
-              </div>
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: 700 }}>Indication for Examination:</div>
+          <div style={{ marginBottom: 6 }}>Personal history of colonic polyps.</div>
+          <div style={{ fontWeight: 700 }}>Medications:</div>
+          <textarea style={styles.textareaSmall} value={medications} onChange={(e) => setMedications(e.target.value)} />
+        </div>
 
-              <div style={styles.subtab}>
-                <h4 style={styles.subtabHeader}>Diagnosis</h4>
-                <textarea style={styles.textarea} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} />
-              </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontWeight: 700 }}>Extent of Exam:</div>
+          <input style={{ ...styles.input, marginTop: 6 }} value={extentOfExam} onChange={(e) => setExtentOfExam(e.target.value)} />
+        </div>
 
-              <div style={styles.subtab}>
-                <h4 style={styles.subtabHeader}>Recommendations</h4>
-                <textarea style={styles.textarea} value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
-              </div>
-            </div>
-          </div>
-        </section>
+        <h3 style={styles.sectionHeader}>Description of Procedure</h3>
+        <textarea style={styles.textareaXL} value={description} onChange={(e) => setDescription(e.target.value)} />
 
-        {images && images.length > 0 && (
-          <section style={{ marginTop: 18 }}>
-            <h3 style={styles.sectionHeader}>Procedure Images</h3>
-            <div style={styles.imagesGrid}>
-              {images.map((img, i) => (
-                <figure key={i} style={styles.figure}>
-                  <img src={img.src} alt={`procedure-${i}`} style={styles.image} />
-                  <figcaption style={styles.caption}>{img.caption || ""}</figcaption>
-                </figure>
-              ))}
-            </div>
-          </section>
-        )}
+        <h3 style={styles.sectionHeader}>Findings</h3>
+        <textarea style={styles.textareaXL} value={findings} onChange={(e) => setFindings(e.target.value)} />
+
+        <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+          <img src="/colon.png" alt="colon" style={{ width: 120 }} />
+          {images && images.slice(0,3).map((img, i) => (
+            <img key={i} src={img.src} alt={`img-${i}`} style={{ width: 120 }} />
+          ))}
+        </div>
+
+        <h3 style={styles.sectionHeader}>Diagnosis</h3>
+        <textarea style={styles.textareaXL} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} />
+
+        <h3 style={styles.sectionHeader}>Recommendations</h3>
+        <textarea style={styles.textareaXL} value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
+
+        <h3 style={styles.sectionHeader}>Complications</h3>
+        <textarea style={styles.textareaLarge} value={complications} onChange={(e) => setComplications(e.target.value)} />
+
+        <h3 style={{ ...styles.sectionHeader, marginTop: 18 }}>Limitations</h3>
+        <div>No limitations</div>
+
+        <h3 style={{ ...styles.sectionHeader, marginTop: 18 }}>ICD-10 coding</h3>
+        <div style={{ fontSize: 13 }}>1-650.1 Diagnostische Endoskopie des unteren Verdauungstraktes. Total, bis Zäkum</div>
+
+        <h3 style={{ ...styles.sectionHeader, marginTop: 18 }}>Quality of Care Indicators</h3>
+        <div style={{ fontSize: 13, marginBottom: 6 }}>
+          <div><strong>Polyp Details:</strong></div>
+          <div>* Polyp(s) Detected: Yes</div>
+          <div>* Polypectomy Performed: Yes</div>
+        </div>
 
         <footer style={{ marginTop: 24, fontSize: 12, color: "#666" }}>
           <div>Report generated by EndoDoc Medical Documentation System</div>
@@ -220,20 +207,36 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     marginBottom: 10,
   },
-  logoPlaceholder: {
-    width: 120,
+  logoImage: {
+    width: 140,
     height: 60,
-    background: "#f3f4f6",
-    border: "1px dashed #d1d5db",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: 600,
-    color: "#9ca3af",
+    objectFit: "contain",
   },
   sectionRow: {
     display: "flex",
     gap: 20,
+  },
+  infoColumn: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+  },
+  infoGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 8,
+    alignItems: "start",
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#111827",
+    marginBottom: 4,
+  },
+  readonly: {
+    fontSize: 14,
+    color: "#111",
+    padding: "4px 0",
   },
   twoColumn: {
     flex: 1,
@@ -252,6 +255,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid #e5e7eb",
     borderRadius: 4,
     fontSize: 14,
+    width: "100%",
   },
   textareaLarge: {
     minHeight: 80,
@@ -260,6 +264,16 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     fontSize: 13,
     resize: "vertical",
+    width: "100%",
+  },
+  textareaSmall: {
+    minHeight: 48,
+    padding: "6px 8px",
+    border: "1px solid #e5e7eb",
+    borderRadius: 4,
+    fontSize: 13,
+    resize: "vertical",
+    width: "100%",
   },
   textareaXL: {
     minHeight: 160,
@@ -268,6 +282,31 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     fontSize: 14,
     resize: "vertical",
+    width: "100%",
+  },
+  detailTable: {
+    display: "flex",
+    gap: 20,
+    marginBottom: 12,
+  },
+  tableLeft: {
+    flex: 1,
+  },
+  tableRight: {
+    flex: 1,
+  },
+  tableRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    padding: "2px 0",
+  },
+  tableLabel: {
+    color: "#111827",
+    fontWeight: 700,
+  },
+  tableValue: {
+    color: "#111",
+    textAlign: "right",
   },
   sectionHeader: {
     fontSize: 16,
@@ -296,6 +335,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4,
     fontSize: 13,
     resize: "vertical",
+    width: "100%",
   },
   imagesGrid: {
     display: "flex",
