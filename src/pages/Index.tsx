@@ -10,6 +10,9 @@ import WL from "@/assets/WL.png";
 import WL2 from "@/assets/WL2.png";
 import WL3 from "@/assets/WL3.png";
 import WL4 from "@/assets/WL4.png";
+import IMG1 from "@/assets/IMG1.jpg";
+import IMG2 from "@/assets/IMG2.jpg";
+import IMG3 from "@/assets/IMG3.jpg";
 import WL50 from "@/assets/WL_50.png";
 import WL51 from "@/assets/WL_51.png";
 import WL52 from "@/assets/WL_52.png";
@@ -38,6 +41,15 @@ export interface Procedure {
   date: string;
   procedureType: string;
   surgeon: string;
+  age?: string;
+  sex?: string;
+  referringPhysician?: string;
+  medications?: string;
+  indication?: string;
+  extentOfExam?: string;
+  diagnosis?: string;
+  recommendations?: string;
+  description?: string;
   findings: string;
   complications?: string;
   duration: string;
@@ -55,11 +67,20 @@ const Index = () => {
       patientId: "P-2024-001",
       date: "2024-01-15",
       procedureType: "Diagnostic Gastroscopy",
-      surgeon: "Dr. Smith",
+      surgeon: "Dr. Holota",
+      referringPhysician: "Dr. Kalantari",
+      age: "58",
+      sex: "Male",
+      medications: "5 mg Midazolam",
+      indication: "Dyspepsia",
+      extentOfExam: "Esophagus, Stomach, Duodenum",
       findings: "Normal gastric mucosa, no significant pathology detected",
-      duration: "25 minutes",
-      anesthesia: "Conscious Sedation",
-  images: [WL, WL2, WL50, WL51, WL52, WL53, WL54, WL60, WL61, WL62, WL63, WL64]
+  diagnosis: "Non-ulcer dyspepsia / normal endoscopic exam",
+  complications: "None",
+  recommendations: "No acute intervention required. Recommend lifestyle modification (dietary changes, avoid NSAIDs), trial of proton-pump inhibitor if symptoms persist, and H. pylori testing if clinically indicated.",
+  duration: "25 minutes",
+  anesthesia: "Conscious Sedation",
+      images: [WL, WL2, WL50, WL51, WL52, WL53, WL54, WL60, WL61, WL62, WL63, WL64]
     },
     {
       id: "2",
@@ -67,12 +88,21 @@ const Index = () => {
       patientId: "P-2024-002",
       date: "2024-01-16",
       procedureType: "Colonoscopy",
-      surgeon: "Dr. Johnson",
-      findings: "Small polyp in descending colon, biopsied for analysis",
-      complications: "None",
-      duration: "35 minutes",
-      anesthesia: "General Anesthesia",
-  images: [WL3, WL4, WL55, WL56, WL57, WL58, WL59, WL65, WL66, WL67, WL68, WL69]
+      surgeon: "Dr. Holota",
+      referringPhysician: "Dr. Kalantari",
+      age: "46",
+      sex: "Female",
+      medications: "12.5 mg Midazolam; 400 mg Propofol",
+      indication: "Abdominal pain, melena, constipation",
+      extentOfExam: "Rectum, Colon (sigmoid, descending, transverse, ascendens), terminal Ileum",
+  description: "Colonoscopy performed after informed consent. The colonoscope was advanced to the cecum with visualization of the terminal ileum. Bowel preparation was adequate. During withdrawal, careful inspection of the sigmoid colon demonstrated a flat lesion which was resected endoscopically. Attention was then turned to the terminal ileum where a diverticular outpouching with adherent blood clot was identified, suspicious for Meckel diverticulum. Hemostasis was achieved with targeted irrigation and placement of a hemostatic clip over the bleeding point.",
+  findings: "A flat polyp identified in the sigmoid colon (~1 x 1 cm) at approximately 30 cm aborally. A diverticulum is identified in the terminal ileum approximately 10 cm from the ileocecal valve with signs of local bleeding; appearance is suggestive of a Meckel diverticulum.",
+  diagnosis: "Meckel diverticulum; flat sigmoid polyp (resected)",
+  complications: "Peri-procedural bleeding controlled endoscopically",
+  duration: "30 minutes",
+  anesthesia: "Conscious Sedation",
+  recommendations: "Polyp retrieved and sent for histologic analysis. Recommend surgical consultation regarding Meckel diverticulum given ongoing bleeding risk; consider cross-sectional imaging (CT enterography) if bleeding recurs. Initiate iron supplementation and outpatient follow-up in 2 weeks.",
+  images: [IMG1, IMG2, IMG3, WL3, WL4, WL55, WL56, WL57, WL58, WL59, WL65, WL66, WL67, WL68, WL69]
     }
   ]);
 
@@ -98,7 +128,7 @@ const Index = () => {
               <Activity className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">EndoDoc</h1>
+              <h1 className="text-2xl font-bold text-foreground">ReportPilot</h1>
               <p className="text-sm text-muted-foreground">Endoscopic Surgery Documentation</p>
             </div>
           </div>

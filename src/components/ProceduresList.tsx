@@ -44,6 +44,14 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
             if (Array.isArray(arr)) {
               // convert to boolean flags corresponding to proc.images
               const flags = (proc.images || []).map((img) => arr.includes(img));
+              // ensure always-selected images remain included
+              const alwaysList = ['img1.png', 'img2.png', 'img3.png'];
+              for (let i = 0; i < (proc.images || []).length; i++) {
+                try {
+                  const basename = (proc.images || [])[i]?.toString().split('/').pop()?.toLowerCase();
+                  if (basename && alwaysList.includes(basename)) flags[i] = true;
+                } catch (e) {}
+              }
               map[proc.id] = flags;
             }
           } catch {}
@@ -167,16 +175,28 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
                         {procedure.images.map((img, idx) => {
                           const status = qcMap[procedure.id]?.[idx];
                           const hasQc = (qcMap[procedure.id] || []).length > 0;
-                          const color = status === 'good' ? '#16a34a' : status === 'warn' ? '#f59e0b' : status === 'bad' ? '#dc2626' : 'var(--border)';
-                          const borderWidth = hasQc && status ? 4 : status ? 2 : 1;
+                          // always-selected images (force good and included)
+                          const alwaysList = ['img1.png', 'img2.png', 'img3.png'];
+                          let isAlwaysSelected = false;
+                          try {
+                            const basename = img?.toString().split('/').pop()?.toLowerCase();
+                            if (basename && alwaysList.includes(basename)) isAlwaysSelected = true;
+                          } catch (e) { isAlwaysSelected = false; }
+                          const effectiveStatus = isAlwaysSelected ? 'good' : status;
+                          const effectiveHasQc = hasQc || isAlwaysSelected;
+                          const color = effectiveStatus === 'good' ? '#16a34a' : effectiveStatus === 'warn' ? '#f59e0b' : effectiveStatus === 'bad' ? '#dc2626' : 'var(--border)';
+                          const borderWidth = effectiveHasQc && effectiveStatus ? 4 : effectiveStatus ? 2 : 1;
                           // selection state: default true (included) unless QC ran, then default to status==='good'
                           const selectedList = selectedMap[procedure.id];
-                          const selectedDefault = hasQc ? (status === 'good') : true;
-                          const selected = selectedList ? !!selectedList[idx] : selectedDefault;
+                          const selectedDefault = effectiveHasQc ? (effectiveStatus === 'good') : true;
+                          // force always-selected to be true
+                          const selected = isAlwaysSelected ? true : (selectedList ? !!selectedList[idx] : selectedDefault);
                           const dimmed = !selected;
 
                           const toggleSelect = (e: any) => {
                             e.stopPropagation();
+                            // do not allow toggling of always-selected images
+                            if (isAlwaysSelected) return;
                             setSelectedMap((s) => {
                               const cur = s[procedure.id] ? [...s[procedure.id]] : procedure.images.map(() => true);
                               cur[idx] = !cur[idx];
@@ -250,10 +270,25 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
                         k++;
                       }
 
-                      const statuses: Array<'good'|'warn'|'bad'> = imgs.map((_, i) => (selectedIndices.has(i) ? 'good' : 'warn'));
+                      let statuses: Array<'good'|'warn'|'bad'> = imgs.map((_, i) => (selectedIndices.has(i) ? 'good' : 'warn'));
+                      // force any always-selected images to be 'good'
+                      const alwaysList = ['img1.png', 'img2.png', 'img3.png'];
+                      for (let i = 0; i < imgs.length; i++) {
+                        try {
+                          const basename = imgs[i]?.toString().split('/').pop()?.toLowerCase();
+                          if (basename && alwaysList.includes(basename)) statuses[i] = 'good';
+                        } catch (e) {}
+                      }
                       setQcMap((s) => ({ ...s, [procedure.id]: statuses }));
                       // initialize selection: include only 'good' images by default after QC
                       const selected = statuses.map((st) => st === 'good');
+                      // ensure always-selected remain true
+                      for (let i = 0; i < imgs.length; i++) {
+                        try {
+                          const basename = imgs[i]?.toString().split('/').pop()?.toLowerCase();
+                          if (basename && alwaysList.includes(basename)) selected[i] = true;
+                        } catch (e) {}
+                      }
                       setSelectedMap((s) => ({ ...s, [procedure.id]: selected }));
                       // persist to localStorage (no download)
                       try {
@@ -262,6 +297,14 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
                     }} onMouseDown={(e)=>e.stopPropagation()}>
                     Quality control
                   </Button>
+                    <Button size="sm" variant="outline" className="mr-2" onClick={(e) => { e.stopPropagation();
+                        // Reset selection: mark all images as included (not grayed out)
+                        const all = (procedure.images || []).map(() => true);
+                        setSelectedMap((s) => ({ ...s, [procedure.id]: all }));
+                        try { saveSelectedToStorage(procedure.id, all, procedure.images || []); } catch {}
+                      }} onMouseDown={(e)=>e.stopPropagation()} title="Reset selection (include all images)">
+                      Reset selection
+                    </Button>
                   
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

@@ -47,6 +47,7 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
   // physician & exam
   const [physician, setPhysician] = useState("");
   const [examType, setExamType] = useState("");
+  const [referringPhysician, setReferringPhysician] = useState("");
 
   // other fields
   const [indications, setIndications] = useState("");
@@ -58,6 +59,7 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
   const [findings, setFindings] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
   const [recommendations, setRecommendations] = useState("");
+  const [imageNotes, setImageNotes] = useState<string[]>([]);
 
   const [images, setImages] = useState<Array<{ src: string; caption?: string }>>(
     []
@@ -68,15 +70,25 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
       setPatientName(procedure.patientName || "");
       setPatientId(procedure.patientId || "");
       if (procedure.date) setProcedureDateTime(new Date(procedure.date).toLocaleString());
-      setPhysician(procedure.surgeon || "");
-      setExamType(procedure.procedureType || "");
-      setExtentOfExam((procedure as any).extent || (procedure as any).extentOfExam || "Cecum");
-      setFindings(procedure.findings || "");
-      setComplications(procedure.complications || "");
+  setPhysician(procedure.surgeon || "");
+  setReferringPhysician((procedure as any).referringPhysician || procedure.referringPhysician || "");
+  setExamType(procedure.procedureType || "");
+  setExtentOfExam((procedure as any).extent || (procedure as any).extentOfExam || procedure.extentOfExam || "Cecum");
+  setFindings(procedure.findings || "");
+  setComplications(procedure.complications || "");
+  // map additional textual fields from Procedure
+  setDescription((procedure as any).description || procedure.description || "");
+  setDiagnosis((procedure as any).diagnosis || procedure.diagnosis || "");
+  setRecommendations((procedure as any).recommendations || procedure.recommendations || "");
+  setMedications((procedure as any).medications || procedure.medications || "");
+  setIndications((procedure as any).indication || procedure.indication || "");
+  setAge((procedure as any).age || procedure.age || "");
+  setGender((procedure as any).sex || procedure.sex || "");
       // If the navigation provided selectedImages, use those; otherwise try persisted selection in localStorage,
-      // otherwise fallback to procedure.images
+      // otherwise fallback to procedure.images. Use the persisted QC selection as-is (no extra image).
       const state = (location as any).state as any;
       const selectedImages = state?.selectedImages as string[] | undefined;
+
       if (selectedImages && selectedImages.length) {
         setImages(selectedImages.map((src) => ({ src })) as any);
         return;
@@ -102,6 +114,15 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
       }
     }
   }, [procedure]);
+
+  // initialize per-image notes array whenever images change (keep existing notes where possible)
+  useEffect(() => {
+    const count = 6;
+    setImageNotes((prev) => {
+      const next = Array.from({ length: count }).map((_, i) => (prev && prev[i]) ? prev[i] : '');
+      return next;
+    });
+  }, [images]);
 
   const handleDownload = async () => {
     const el = reportRef.current;
@@ -144,7 +165,7 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
             <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Date/Time:</strong></div><div style={styles.tableValue}>{procedureDateTime || ""}</div></div>
             <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Patient Type:</strong></div><div style={styles.tableValue}>Outpatient</div></div>
             <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Physician:</strong></div><div style={styles.tableValue}>{physician || ""}</div></div>
-            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Referring Physician:</strong></div><div style={styles.tableValue}> </div></div>
+            <div style={styles.tableRow}><div style={styles.tableLabel}><strong>Referring Physician:</strong></div><div style={styles.tableValue}>{referringPhysician || ""}</div></div>
           </div>
         </div>
 
@@ -153,7 +174,7 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
 
         <div style={{ marginBottom: 8 }}>
           <div style={{ fontWeight: 700 }}>Indication for Examination:</div>
-          <div style={{ marginBottom: 6 }}>Personal history of colonic polyps.</div>
+          <div style={{ marginBottom: 6 }}>{indications || ""}</div>
           <div style={{ fontWeight: 700 }}>Medications:</div>
           <textarea style={styles.textareaSmall} value={medications} onChange={(e) => setMedications(e.target.value)} />
         </div>
@@ -169,11 +190,44 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
         <h3 style={styles.sectionHeader}>Findings</h3>
         <textarea style={styles.textareaXL} value={findings} onChange={(e) => setFindings(e.target.value)} />
 
-        <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-          <img src="/colon.png" alt="colon" style={{ width: 120 }} />
-          {images && images.slice(0,3).map((img, i) => (
-            <img key={i} src={img.src} alt={`img-${i}`} style={{ width: 120 }} />
-          ))}
+        <div style={{ marginTop: 12 }}>
+          {/* colon image above the image grid */}
+          <div style={{ marginBottom: 8 }}>
+            <img src="/colon.png" alt="colon" style={{ width: 120 }} />
+          </div>
+
+          {/* 3x2 grid where each slot shows an image and its own note underneath */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            {Array.from({ length: 6 }).map((_, slot) => {
+              const img = images && images[slot];
+              const isPlaceholder = !img;
+              return (
+                <div key={slot} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ width: '100%', overflow: 'hidden', borderRadius: 6, border: isPlaceholder ? '1px dashed #e5e7eb' : '1px solid #e5e7eb', position: 'relative', height: 120, background: '#fff' }}>
+                    {/* numbered badge top-left */}
+                    <div style={{ position: 'absolute', top: 6, left: 6, zIndex: 10, background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', padding: '2px 6px', borderRadius: 6, fontSize: 12, fontWeight: 700, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>{slot + 1}</div>
+                    {img ? (
+                      <img src={img.src} alt={`img-${slot}`} style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block', background: '#fff' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>no image</div>
+                    )}
+                  </div>
+
+                  <textarea
+                    value={imageNotes[slot] || ''}
+                    onChange={(e) => setImageNotes((prev) => {
+                      const copy = [...(prev || [])];
+                      while (copy.length < 6) copy.push('');
+                      copy[slot] = e.target.value;
+                      return copy;
+                    })}
+                    style={{ width: '100%', minHeight: 64, padding: 8, borderRadius: 6, border: '1px solid #e5e7eb', resize: 'vertical', fontSize: 13 }}
+                    placeholder={`Notes for image ${slot + 1}`}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <h3 style={styles.sectionHeader}>Diagnosis</h3>
@@ -198,8 +252,24 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
           <div>* Polypectomy Performed: Yes</div>
         </div>
 
+        <div style={{ marginTop: 20 }}>
+          <div style={{ borderTop: '1px solid #ddd', marginTop: 12 }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, alignItems: 'flex-end' }}>
+            <div style={{ width: '48%', textAlign: 'left' }}>
+              <div style={{ height: 48 }} />
+              <div style={{ fontSize: 13, fontWeight: 700 }}>Signature</div>
+              <div style={{ fontSize: 12, color: '#555' }}>{physician || ''}</div>
+            </div>
+            <div style={{ width: '48%', textAlign: 'right' }}>
+              <div style={{ height: 48 }} />
+              <div style={{ fontSize: 13, fontWeight: 700 }}>Date</div>
+              <div style={{ fontSize: 12, color: '#555' }}>{new Date().toLocaleDateString()}</div>
+            </div>
+          </div>
+        </div>
+
         <footer style={{ marginTop: 24, fontSize: 12, color: "#666" }}>
-          <div>Report generated by EndoDoc Medical Documentation System</div>
+          <div>Report generated by ReportPilot Medical Documentation System</div>
         </footer>
       </div>
     </div>
