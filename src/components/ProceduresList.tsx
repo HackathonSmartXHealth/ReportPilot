@@ -21,13 +21,53 @@ import {
 interface ProceduresListProps {
   procedures: Procedure[];
   onDelete: (id: string) => void;
-  onCreateReport: (procedure: Procedure) => void;
+  // second optional param is the list of image srcs selected to include in the report
+  onCreateReport: (procedure: Procedure, selectedImages?: string[]) => void;
 }
 
 export const ProceduresList = ({ procedures, onDelete, onCreateReport }: ProceduresListProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [qcMap, setQcMap] = useState<Record<string, Array<'good' | 'warn' | 'bad'>>>({});
-  const [showAllMap, setShowAllMap] = useState<Record<string, boolean>>({});
+  const [selectedMap, setSelectedMap] = useState<Record<string, boolean[]>>({});
+
+  // initialize selectedMap from localStorage so selections persist when navigating back
+  // This runs once on component mount.
+  useState(() => {
+    try {
+      const map: Record<string, boolean[]> = {};
+      procedures.forEach((proc) => {
+        const key = `selectedImages_${proc.id}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          try {
+            const arr = JSON.parse(stored) as string[];
+            if (Array.isArray(arr)) {
+              // convert to boolean flags corresponding to proc.images
+              const flags = (proc.images || []).map((img) => arr.includes(img));
+              map[proc.id] = flags;
+            }
+          } catch {}
+        }
+      });
+      if (Object.keys(map).length) setSelectedMap((s) => ({ ...s, ...map }));
+    } catch (err) {
+      // ignore
+    }
+    return null;
+  });
+
+  // Persist the selected image srcs for a procedure to localStorage only.
+  // We intentionally DO NOT trigger a download here. To write into the repository's
+  // asset folder you'll need to run a local Node script (scripts/saveSelectionToAssets.js)
+  // which can copy a local selection file into src/assets.
+  const saveSelectedToStorage = (procedureId: string, selectedFlags: boolean[], images: string[]) => {
+    try {
+      const selectedSrcs = images.filter((_, i) => selectedFlags[i]);
+      localStorage.setItem(`selectedImages_${procedureId}`, JSON.stringify(selectedSrcs));
+    } catch (err) {
+      console.warn('Could not save selected images to storage', err);
+    }
+  };
 
   const filteredProcedures = procedures.filter(
     (proc) =>
@@ -61,7 +101,10 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
               className="p-4 hover:shadow-lg transition-all cursor-pointer hover:border-primary/50 relative group"
               onClick={(e) => {
                 if (!(e.target as HTMLElement).closest('button')) {
-                  onCreateReport(procedure);
+                  // compute selected images for this procedure (default: include all)
+                  const selectedFlags = selectedMap[procedure.id] || procedure.images?.map(() => true) || [];
+                  const selectedImages = (procedure.images || []).filter((src, i) => selectedFlags[i]);
+                  onCreateReport(procedure, selectedImages);
                 }
               }}
             >
@@ -117,91 +160,109 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
                       {/* header with title and QC controls */}
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-sm font-medium text-foreground">Procedure Images:</p>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={(e) => { e.stopPropagation();
-                              const imgs = procedure.images || [];
-                              const statuses: Array<'good'|'warn'|'bad'> = imgs.map(() => {
-                                const r = Math.random();
-                                if (r < 0.5) return 'good';
-                                if (r < 0.8) return 'warn';
-                                return 'bad';
-                              });
-                              setQcMap((s) => ({ ...s, [procedure.id]: statuses }));
-                            }} onMouseDown={(e)=>e.stopPropagation()}>
-                            Quality control
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setShowAllMap((s) => ({ ...s, [procedure.id]: !s[procedure.id] })); }}>
-                            {showAllMap[procedure.id] ? 'Collapse' : 'Show all'}
-                          </Button>
-                        </div>
                       </div>
 
-                      {/* If collapsed show horizontal scroll (max per row view), if expanded show grid with up to 7 cols */}
-                      {showAllMap[procedure.id] ? (
-                        /* expanded: render as horizontal grid (columns) that scrolls horizontally */
-                        <div className="inline-grid" style={{ display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(140px, 140px)', gap: 12 }}>
-                          {procedure.images.map((img, idx) => {
-                            const status = qcMap[procedure.id]?.[idx];
-                            const hasQc = (qcMap[procedure.id] || []).length > 0;
-                            const color = status === 'good' ? '#16a34a' : status === 'warn' ? '#f59e0b' : status === 'bad' ? '#dc2626' : 'var(--border)';
-                            const borderWidth = hasQc && status ? 4 : status ? 2 : 1;
-                            return (
-                              <div key={idx} className="" style={{ textAlign: 'center' }}>
-                                <img src={img} alt={`Procedure ${idx + 1}`} style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 6, border: `${borderWidth}px solid ${color}` }} />
+                      {/* Always show expanded responsive grid by default */}
+                      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+                        {procedure.images.map((img, idx) => {
+                          const status = qcMap[procedure.id]?.[idx];
+                          const hasQc = (qcMap[procedure.id] || []).length > 0;
+                          const color = status === 'good' ? '#16a34a' : status === 'warn' ? '#f59e0b' : status === 'bad' ? '#dc2626' : 'var(--border)';
+                          const borderWidth = hasQc && status ? 4 : status ? 2 : 1;
+                          // selection state: default true (included) unless QC ran, then default to status==='good'
+                          const selectedList = selectedMap[procedure.id];
+                          const selectedDefault = hasQc ? (status === 'good') : true;
+                          const selected = selectedList ? !!selectedList[idx] : selectedDefault;
+                          const dimmed = !selected;
+
+                          const toggleSelect = (e: any) => {
+                            e.stopPropagation();
+                            setSelectedMap((s) => {
+                              const cur = s[procedure.id] ? [...s[procedure.id]] : procedure.images.map(() => true);
+                              cur[idx] = !cur[idx];
+                              // persist updated selection immediately
+                              try {
+                                saveSelectedToStorage(procedure.id, cur, procedure.images || []);
+                              } catch {}
+                              return { ...s, [procedure.id]: cur };
+                            });
+                          };
+
+                          return (
+                            <div key={idx} className="flex flex-col items-center" style={{ textAlign: 'center' }}>
+                              <div
+                                onClick={toggleSelect}
+                                role="button"
+                                aria-pressed={selected}
+                                title={selected ? 'Included in report - click to exclude' : 'Excluded from report - click to include'}
+                                style={{
+                                  border: `${borderWidth}px solid ${color}`,
+                                  borderRadius: 8,
+                                  overflow: 'hidden',
+                                  width: '100%'
+                                }}
+                              >
+                                <img
+                                  src={img}
+                                  alt={`Procedure ${idx + 1}`}
+                                  style={{
+                                    display: 'block',
+                                    width: '100%',
+                                    height: 110,
+                                    objectFit: 'cover',
+                                    filter: dimmed ? 'grayscale(100%) brightness(0.6)' : undefined,
+                                    opacity: dimmed ? 0.6 : 1,
+                                    cursor: 'pointer'
+                                  }}
+                                />
                               </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-                          <div className="flex w-max space-x-4 p-4" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
-                            {procedure.images.map((img, idx) => {
-                              const status = qcMap[procedure.id]?.[idx];
-                              const hasQc = (qcMap[procedure.id] || []).length > 0;
-                              const color = status === 'good' ? '#16a34a' : status === 'warn' ? '#f59e0b' : status === 'bad' ? '#dc2626' : 'var(--border)';
-                              const borderWidth = hasQc && status ? 4 : status ? 2 : 1;
-                              return (
-                                <div key={idx} className="relative shrink-0">
-                                  <img 
-                                    src={img} 
-                                    alt={`Procedure ${idx + 1}`} 
-                                    className="object-cover rounded"
-                                    style={{ height: 110, width: 140, border: `${borderWidth}px solid ${color}` }}
-                                  />
-                                </div>
-                              );
-                            })}
-                            {procedure.images.length > 7 && (
-                              <div className="flex items-center justify-center h-24 w-20 shrink-0 text-muted-foreground">
-                                <ChevronRight className="w-6 h-6" />
-                              </div>
-                            )}
-                          </div>
-                          <ScrollBar orientation="horizontal" />
-                        </ScrollArea>
-                      )}
+                            </div>
+                          );
+                        })}
+                      </div>
                       </div>
                     </div>
                   )}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation();
-                      // toggle QC: run random QC for this procedure
+                  <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 mr-2" onClick={(e) => { e.stopPropagation();
+                      // Deterministic QC: pick exactly 5 images (or fewer if not available) to mark as 'good'.
+                      // The selection is deterministic per procedure.id using a simple hash so the same images
+                      // are chosen each time QC runs for the same procedure.
                       const imgs = procedure.images || [];
-                      const statuses: Array<'good'|'warn'|'bad'> = imgs.map(() => {
-                        const r = Math.random();
-                        if (r < 0.5) return 'good';
-                        if (r < 0.8) return 'warn';
-                        return 'bad';
-                      });
+                      const n = imgs.length;
+                      const want = Math.min(5, n);
+
+                      // simple hash from procedure.id -> number
+                      let hash = 0;
+                      for (let i = 0; i < (procedure.id || '').length; i++) {
+                        hash = (hash * 31 + (procedure.id || '').charCodeAt(i)) >>> 0;
+                      }
+
+                      const selectedIndices = new Set<number>();
+                      let k = 0;
+                      // step uses a small prime to distribute picks
+                      const step = 7;
+                      while (selectedIndices.size < want && n > 0 && k < n * 2) {
+                        const idx = (hash + k * step) % n;
+                        selectedIndices.add(idx);
+                        k++;
+                      }
+
+                      const statuses: Array<'good'|'warn'|'bad'> = imgs.map((_, i) => (selectedIndices.has(i) ? 'good' : 'warn'));
                       setQcMap((s) => ({ ...s, [procedure.id]: statuses }));
-                    }} className="mr-2" onMouseDown={(e)=>e.stopPropagation()}>
+                      // initialize selection: include only 'good' images by default after QC
+                      const selected = statuses.map((st) => st === 'good');
+                      setSelectedMap((s) => ({ ...s, [procedure.id]: selected }));
+                      // persist to localStorage (no download)
+                      try {
+                        saveSelectedToStorage(procedure.id, selected, procedure.images || []);
+                      } catch {}
+                    }} onMouseDown={(e)=>e.stopPropagation()}>
                     Quality control
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setShowAllMap((s) => ({ ...s, [procedure.id]: !s[procedure.id] })); }} className="mr-2">
-                    {showAllMap[procedure.id] ? 'Collapse' : 'Show all'}
-                  </Button>
+                  
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button 

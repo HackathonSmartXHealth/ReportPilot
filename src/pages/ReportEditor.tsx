@@ -73,6 +73,30 @@ function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }
       setExtentOfExam((procedure as any).extent || (procedure as any).extentOfExam || "Cecum");
       setFindings(procedure.findings || "");
       setComplications(procedure.complications || "");
+      // If the navigation provided selectedImages, use those; otherwise try persisted selection in localStorage,
+      // otherwise fallback to procedure.images
+      const state = (location as any).state as any;
+      const selectedImages = state?.selectedImages as string[] | undefined;
+      if (selectedImages && selectedImages.length) {
+        setImages(selectedImages.map((src) => ({ src })) as any);
+        return;
+      }
+
+      // fallback: try reading persisted selections from localStorage (saved by ProceduresList)
+      try {
+        const storageKey = `selectedImages_${procedure.id}`;
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored) as string[];
+          if (Array.isArray(parsed) && parsed.length) {
+            setImages(parsed.map((src) => ({ src })) as any);
+            return;
+          }
+        }
+      } catch (err) {
+        // ignore parse errors and fall back to procedure.images
+      }
+
       if (procedure.images && procedure.images.length) {
         setImages(procedure.images.map((src) => ({ src })) as any);
       }

@@ -149,7 +149,7 @@ const Index = () => {
                 <ProceduresList 
                   procedures={procedures}
                   onDelete={handleDeleteProcedure}
-                  onCreateReport={(procedure) => navigate(`/report/${procedure.id}`, { state: { procedure } })}
+                  onCreateReport={(procedure, selectedImages) => navigate(`/report/${procedure.id}`, { state: { procedure, selectedImages } })}
                 />
               </CardContent>
             </Card>
