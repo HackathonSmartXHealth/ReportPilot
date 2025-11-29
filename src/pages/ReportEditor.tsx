@@ -1,204 +1,324 @@
-import { useState, useEffect, useRef } from "react";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Download, Activity } from "lucide-react";
-import { Procedure } from "@/pages/Index";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import { Procedure } from "./Index";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
-const ReportEditor = () => {
-  const { id } = useParams();
+// A clean, printable A4-like surgical report editor page
+export default function ReportEditor() {
   const location = useLocation();
   const navigate = useNavigate();
-  const procedure = location.state?.procedure as Procedure;
-
-  
-
-  // PDF of the structured layout handled within SurgicalReport component
-
-  if (!procedure) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="p-6">
-          <p className="text-muted-foreground mb-4">No procedure data found</p>
-          <Button onClick={() => navigate("/")} className="mt-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </Card>
-      </div>
-    );
-  }
+  const procedure = location.state?.procedure as Procedure | undefined;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <header className="border-b border-border/50 bg-card/95 backdrop-blur-sm shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-muted/10 py-6">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="hover:bg-primary/10">
-              <ArrowLeft className="w-5 h-5" />
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="w-4 h-4" />
             </Button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Activity className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground">Medical Report Editor</h1>
-                <p className="text-sm text-muted-foreground">{procedure.patientName} - {procedure.patientId}</p>
-              </div>
-            </div>
+            <h1 className="text-xl font-bold">Report Editor</h1>
           </div>
-          {/* The download button is provided inside the SurgicalReport component */}
-          <div />
         </div>
-      </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-5xl">
-        <Card className="shadow-2xl border-border/50 overflow-hidden p-6">
-          <SurgicalReport procedure={procedure} />
+        <Card className="p-6">
+          <SurgicalReportPage procedure={procedure} />
         </Card>
-      </main>
+      </div>
     </div>
   );
-};
+}
 
-export default ReportEditor;
-
-// SurgicalReport component per requested implementation
-function SurgicalReport({ procedure }: { procedure?: Procedure | null }) {
+function SurgicalReportPage({ procedure }: { procedure?: Procedure | undefined }) {
   const reportRef = useRef<HTMLDivElement | null>(null);
 
-  // Controlled fields for the report sections
-  const [info, setInfo] = useState<string>("");
-  const [description, setDescription] = useState<string>("");
-  const [findings, setFindings] = useState<string>("");
-  const [diagnosis, setDiagnosis] = useState<string>("");
-  const [recommendations, setRecommendations] = useState<string>("");
-  const [complications, setComplications] = useState<string>("");
+  // Patient / procedure fields
+  const [patientName, setPatientName] = useState("");
+  const [dob, setDob] = useState("");
+  const [gender, setGender] = useState("");
+  const [age, setAge] = useState("");
+  const [patientId, setPatientId] = useState("");
+  const [procedureDateTime, setProcedureDateTime] = useState("");
+
+  // physician & exam
+  const [physician, setPhysician] = useState("");
+  const [examType, setExamType] = useState("");
+
+  // other fields
+  const [indications, setIndications] = useState("");
+  const [medications, setMedications] = useState("");
+  const [complications, setComplications] = useState("");
+
+  const [description, setDescription] = useState("");
+  const [findings, setFindings] = useState("");
+  const [diagnosis, setDiagnosis] = useState("");
+  const [recommendations, setRecommendations] = useState("");
+
+  const [images, setImages] = useState<Array<{ src: string; caption?: string }>>(
+    []
+  );
 
   useEffect(() => {
     if (procedure) {
-      setInfo(
-        `Patient Name: ${procedure.patientName}\nPatient ID: ${procedure.patientId}\nDate: ${new Date(
-          procedure.date
-        ).toLocaleString()}\nPhysician: ${procedure.surgeon || ""}\nProcedure: ${procedure.procedureType || ""}\nAnesthesia: ${procedure.anesthesia || ""}\nDuration: ${procedure.duration || ""}`
-      );
-      setDescription((procedure as any).description || "");
+      setPatientName(procedure.patientName || "");
+      setPatientId(procedure.patientId || "");
+      if (procedure.date) setProcedureDateTime(new Date(procedure.date).toLocaleString());
+      setPhysician(procedure.surgeon || "");
+      setExamType(procedure.procedureType || "");
       setFindings(procedure.findings || "");
-      setDiagnosis((procedure as any).diagnosis || "");
-      setRecommendations((procedure as any).recommendations || "");
       setComplications(procedure.complications || "");
+      if (procedure.images && procedure.images.length) {
+        setImages(procedure.images.map((src) => ({ src })) as any);
+      }
     }
   }, [procedure]);
 
-  const handleDownloadPDF = async () => {
-    const element = reportRef.current;
-    if (!element) return;
-    // Ensure focus is blurred so caret doesn't appear in capture
+  const handleDownload = async () => {
+    const el = reportRef.current;
+    if (!el) return;
     (document.activeElement as HTMLElement)?.blur?.();
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff'
-    });
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
     const imgData = canvas.toDataURL("image/png");
     const pdf = new jsPDF("p", "mm", "a4");
     const imgProps = pdf.getImageProperties(imgData);
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
     pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`${procedure?.patientId || "Surgical"}_Report.pdf`);
+    pdf.save(`${patientId || "surgical"}_report.pdf`);
   };
 
   return (
-    <div style={reportStyles.page}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={handleDownloadPDF} style={reportStyles.button}>
+    <div>
+      <div className="flex justify-end mb-3">
+        <button onClick={handleDownload} style={styles.downloadButton}>
           Download as PDF
         </button>
       </div>
-      <div ref={reportRef} style={reportStyles.report}>
-        <h1 style={reportStyles.title}>Surgical Report</h1>
 
-        <ReportSection title="Patient / Procedure Information" value={info} onChange={setInfo} />
-        <ReportSection title="Description of Procedure" value={description} onChange={setDescription} />
-        <ReportSection title="Findings" value={findings} onChange={setFindings} />
-        <ReportSection title="Diagnosis" value={diagnosis} onChange={setDiagnosis} />
-        <ReportSection title="Recommendations" value={recommendations} onChange={setRecommendations} />
-        <ReportSection title="Complications" value={complications} onChange={setComplications} />
+      <div ref={reportRef} style={styles.page}>
+        <div style={styles.headerRow}>
+          <div style={styles.logoPlaceholder}>LOGO</div>
+          <div style={{ flex: 1 }} />
+        </div>
+
+        <section style={styles.sectionRow}>
+          <div style={styles.twoColumn}>
+            <label style={styles.label}>Patient Name</label>
+            <input style={styles.input} value={patientName} onChange={(e) => setPatientName(e.target.value)} />
+
+            <label style={styles.label}>Date of Birth</label>
+            <input style={styles.input} value={dob} onChange={(e) => setDob(e.target.value)} />
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={styles.label}>Gender</label>
+                <input style={styles.input} value={gender} onChange={(e) => setGender(e.target.value)} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={styles.label}>Age</label>
+                <input style={styles.input} value={age} onChange={(e) => setAge(e.target.value)} />
+              </div>
+            </div>
+
+            <label style={styles.label}>Patient ID</label>
+            <input style={styles.input} value={patientId} onChange={(e) => setPatientId(e.target.value)} />
+
+            <label style={styles.label}>Date / Time of Procedure</label>
+            <input style={styles.input} value={procedureDateTime} onChange={(e) => setProcedureDateTime(e.target.value)} />
+          </div>
+
+          <div style={styles.twoColumn}>
+            <label style={styles.label}>Physician</label>
+            <input style={styles.input} value={physician} onChange={(e) => setPhysician(e.target.value)} />
+
+            <label style={styles.label}>Exam / Procedure Type</label>
+            <input style={styles.input} value={examType} onChange={(e) => setExamType(e.target.value)} />
+
+            <label style={styles.label}>Indications</label>
+            <textarea style={styles.textareaLarge} value={indications} onChange={(e) => setIndications(e.target.value)} />
+
+            <label style={styles.label}>Medications</label>
+            <textarea style={styles.textareaLarge} value={medications} onChange={(e) => setMedications(e.target.value)} />
+
+            <label style={styles.label}>Complications</label>
+            <textarea style={styles.textareaLarge} value={complications} onChange={(e) => setComplications(e.target.value)} />
+          </div>
+        </section>
+
+        <section style={{ ...styles.sectionRow, marginTop: 18 }}>
+          <div style={{ flex: 1 }}>
+            <h3 style={styles.sectionHeader}>Procedure Description</h3>
+            <textarea style={styles.textareaXL} value={description} onChange={(e) => setDescription(e.target.value)} />
+
+            <div style={styles.subtabs}>
+              <div style={styles.subtab}>
+                <h4 style={styles.subtabHeader}>Findings</h4>
+                <textarea style={styles.textarea} value={findings} onChange={(e) => setFindings(e.target.value)} />
+              </div>
+
+              <div style={styles.subtab}>
+                <h4 style={styles.subtabHeader}>Diagnosis</h4>
+                <textarea style={styles.textarea} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} />
+              </div>
+
+              <div style={styles.subtab}>
+                <h4 style={styles.subtabHeader}>Recommendations</h4>
+                <textarea style={styles.textarea} value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {images && images.length > 0 && (
+          <section style={{ marginTop: 18 }}>
+            <h3 style={styles.sectionHeader}>Procedure Images</h3>
+            <div style={styles.imagesGrid}>
+              {images.map((img, i) => (
+                <figure key={i} style={styles.figure}>
+                  <img src={img.src} alt={`procedure-${i}`} style={styles.image} />
+                  <figcaption style={styles.caption}>{img.caption || ""}</figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <footer style={{ marginTop: 24, fontSize: 12, color: "#666" }}>
+          <div>Report generated by EndoDoc Medical Documentation System</div>
+        </footer>
       </div>
     </div>
   );
 }
 
-function ReportSection({
-  title,
-  value,
-  onChange,
-}: {
-  title: string;
-  value: string;
-  onChange: (val: string) => void;
-}) {
-  return (
-    <div style={reportStyles.section}>
-      <h2 style={reportStyles.header}>{title}</h2>
-      <textarea
-        style={reportStyles.textarea}
-        placeholder={`Enter ${title}...`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </div>
-  );
-}
-
-const reportStyles: Record<string, React.CSSProperties> = {
-  page: {
-    fontFamily: "Arial, sans-serif",
-    padding: "20px",
-    background: "#f5f5f5",
-    minHeight: "100vh",
-  },
-  button: {
-    marginBottom: "20px",
-    padding: "10px 16px",
-    fontSize: "16px",
-    background: "#007bff",
+const styles: Record<string, React.CSSProperties> = {
+  downloadButton: {
+    padding: "8px 12px",
+    background: "#0b74de",
     color: "white",
     border: "none",
-    borderRadius: "6px",
+    borderRadius: 6,
     cursor: "pointer",
   },
-  report: {
-    background: "white",
-    padding: "25px 35px",
-    width: "794px", // A4 width in px at ~96dpi
+  page: {
+    width: 794, // A4 width at ~96dpi
+    minHeight: 1123, // A4 height at ~96dpi
     margin: "0 auto",
-    borderRadius: "6px",
-    boxShadow: "0 0 10px rgba(0,0,0,0.15)",
+    background: "white",
+    padding: 28,
+    boxSizing: "border-box",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+    color: "#111",
+    fontFamily: "Georgia, 'Times New Roman', serif",
   },
-  title: {
-    textAlign: "center",
-    marginBottom: "25px",
-    fontSize: "28px",
+  headerRow: {
+    display: "flex",
+    alignItems: "center",
+    marginBottom: 10,
   },
-  section: {
-    marginBottom: "22px",
+  logoPlaceholder: {
+    width: 120,
+    height: 60,
+    background: "#f3f4f6",
+    border: "1px dashed #d1d5db",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 600,
+    color: "#9ca3af",
   },
-  header: {
-    fontSize: "18px",
-    marginBottom: "8px",
+  sectionRow: {
+    display: "flex",
+    gap: 20,
+  },
+  twoColumn: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#111827",
+    marginTop: 6,
+  },
+  input: {
+    padding: "8px 10px",
+    border: "1px solid #e5e7eb",
+    borderRadius: 4,
+    fontSize: 14,
+  },
+  textareaLarge: {
+    minHeight: 80,
+    padding: "8px 10px",
+    border: "1px solid #e5e7eb",
+    borderRadius: 4,
+    fontSize: 13,
+    resize: "vertical",
+  },
+  textareaXL: {
+    minHeight: 160,
+    padding: "10px",
+    border: "1px solid #e5e7eb",
+    borderRadius: 4,
+    fontSize: 14,
+    resize: "vertical",
+  },
+  sectionHeader: {
+    fontSize: 16,
+    fontWeight: 700,
+    marginBottom: 8,
+  },
+  subtabs: {
+    display: "flex",
+    gap: 12,
+    marginTop: 12,
+  },
+  subtab: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+  },
+  subtabHeader: {
+    fontSize: 14,
+    fontWeight: 700,
+    marginBottom: 6,
   },
   textarea: {
-    width: "100%",
-    minHeight: "100px",
-    borderRadius: "4px",
-    border: "1px solid #ccc",
-    padding: "10px",
-    fontSize: "14px",
+    minHeight: 80,
+    padding: "8px 10px",
+    border: "1px solid #e5e7eb",
+    borderRadius: 4,
+    fontSize: 13,
     resize: "vertical",
+  },
+  imagesGrid: {
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap",
+    marginTop: 8,
+  },
+  figure: {
+    width: 180,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 6,
+  },
+  image: {
+    width: "100%",
+    height: 120,
+    objectFit: "cover",
+    borderRadius: 4,
+    border: "1px solid #e5e7eb",
+  },
+  caption: {
+    fontSize: 12,
+    color: "#374151",
   },
 };
