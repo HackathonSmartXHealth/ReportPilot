@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Search, Trash2, Calendar, User, Clock, FileText, FileDown } from "lucide-react";
+import { Search, Trash2, Calendar, User, Clock, FileText, FileDown, ChevronRight } from "lucide-react";
 import { Procedure } from "@/pages/Index";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -103,25 +103,25 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
                   {procedure.images && procedure.images.length > 0 && (
                     <div className="mt-4">
                       <p className="text-sm font-medium text-foreground mb-2">Procedure Images:</p>
-                      <Carousel className="w-full max-w-md">
-                        <CarouselContent>
+                      <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+                        <div className="flex w-max space-x-4 p-4">
                           {procedure.images.map((img, idx) => (
-                            <CarouselItem key={idx} className="basis-1/4">
+                            <div key={idx} className="relative shrink-0">
                               <img 
                                 src={img} 
                                 alt={`Procedure ${idx + 1}`} 
-                                className="w-full h-24 object-cover rounded border border-border"
+                                className="h-24 w-32 object-cover rounded border border-border"
                               />
-                            </CarouselItem>
+                            </div>
                           ))}
-                        </CarouselContent>
-                        {procedure.images.length > 4 && (
-                          <>
-                            <CarouselPrevious />
-                            <CarouselNext />
-                          </>
-                        )}
-                      </Carousel>
+                          {procedure.images.length > 4 && (
+                            <div className="flex items-center justify-center h-24 w-20 shrink-0 text-muted-foreground">
+                              <ChevronRight className="w-6 h-6" />
+                            </div>
+                          )}
+                        </div>
+                        <ScrollBar orientation="horizontal" />
+                      </ScrollArea>
                     </div>
                   )}
                 </div>

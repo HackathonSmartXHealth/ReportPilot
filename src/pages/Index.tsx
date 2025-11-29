@@ -34,7 +34,8 @@ const Index = () => {
       surgeon: "Dr. Smith",
       findings: "Normal gastric mucosa, no significant pathology detected",
       duration: "25 minutes",
-      anesthesia: "Conscious Sedation"
+      anesthesia: "Conscious Sedation",
+      images: []
     },
     {
       id: "2",
@@ -46,7 +47,8 @@ const Index = () => {
       findings: "Small polyp in descending colon, biopsied for analysis",
       complications: "None",
       duration: "35 minutes",
-      anesthesia: "General Anesthesia"
+      anesthesia: "General Anesthesia",
+      images: []
     }
   ]);
 
