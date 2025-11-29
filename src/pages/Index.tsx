@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, FileText, Calendar, Activity } from "lucide-react";
@@ -17,9 +18,11 @@ export interface Procedure {
   complications?: string;
   duration: string;
   anesthesia: string;
+  images?: string[];
 }
 
 const Index = () => {
+  const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [procedures, setProcedures] = useState<Procedure[]>([
     {
@@ -127,6 +130,7 @@ const Index = () => {
                 <ProceduresList 
                   procedures={procedures}
                   onDelete={handleDeleteProcedure}
+                  onCreateReport={(procedure) => navigate(`/report/${procedure.id}`, { state: { procedure } })}
                 />
               </CardContent>
             </Card>
