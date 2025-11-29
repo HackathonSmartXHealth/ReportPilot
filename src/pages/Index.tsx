@@ -10,6 +10,26 @@ import WL from "@/assets/WL.png";
 import WL2 from "@/assets/WL2.png";
 import WL3 from "@/assets/WL3.png";
 import WL4 from "@/assets/WL4.png";
+import WL50 from "@/assets/WL_50.png";
+import WL51 from "@/assets/WL_51.png";
+import WL52 from "@/assets/WL_52.png";
+import WL53 from "@/assets/WL_53.png";
+import WL54 from "@/assets/WL_54.png";
+import WL55 from "@/assets/WL_55.png";
+import WL56 from "@/assets/WL_56.png";
+import WL57 from "@/assets/WL_57.png";
+import WL58 from "@/assets/WL_58.png";
+import WL59 from "@/assets/WL_59.png";
+import WL60 from "@/assets/WL_60.png";
+import WL61 from "@/assets/WL_61.png";
+import WL62 from "@/assets/WL_62.png";
+import WL63 from "@/assets/WL_63.png";
+import WL64 from "@/assets/WL_64.png";
+import WL65 from "@/assets/WL_65.png";
+import WL66 from "@/assets/WL_66.png";
+import WL67 from "@/assets/WL_67.png";
+import WL68 from "@/assets/WL_68.png";
+import WL69 from "@/assets/WL_69.png";
 
 export interface Procedure {
   id: string;
@@ -39,7 +59,7 @@ const Index = () => {
       findings: "Normal gastric mucosa, no significant pathology detected",
       duration: "25 minutes",
       anesthesia: "Conscious Sedation",
-      images: [WL, WL2]
+  images: [WL, WL2, WL50, WL51, WL52, WL53, WL54, WL60, WL61, WL62, WL63, WL64]
     },
     {
       id: "2",
@@ -52,7 +72,7 @@ const Index = () => {
       complications: "None",
       duration: "35 minutes",
       anesthesia: "General Anesthesia",
-      images: [WL3, WL4]
+  images: [WL3, WL4, WL55, WL56, WL57, WL58, WL59, WL65, WL66, WL67, WL68, WL69]
     }
   ]);
 
@@ -105,7 +125,7 @@ const Index = () => {
           </Card>
         ) : (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <StatsCard
                 title="Total Procedures"
                 value={procedures.length.toString()}
@@ -117,13 +137,6 @@ const Index = () => {
                 value="24"
                 icon={Calendar}
                 trend="+8% from last month"
-              />
-              <StatsCard
-                title="Success Rate"
-                value="98.5%"
-                icon={Activity}
-                trend="+2.1% from last month"
-                variant="success"
               />
             </div>
 

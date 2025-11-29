@@ -26,6 +26,8 @@ interface ProceduresListProps {
 
 export const ProceduresList = ({ procedures, onDelete, onCreateReport }: ProceduresListProps) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [qcMap, setQcMap] = useState<Record<string, Array<'good' | 'warn' | 'bad'>>>({});
+  const [showAllMap, setShowAllMap] = useState<Record<string, boolean>>({});
 
   const filteredProcedures = procedures.filter(
     (proc) =>
@@ -110,31 +112,96 @@ export const ProceduresList = ({ procedures, onDelete, onCreateReport }: Procedu
 
                   {procedure.images && procedure.images.length > 0 && (
                     <div className="mt-4">
-                      <p className="text-sm font-medium text-foreground mb-2">Procedure Images:</p>
-                      <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-                        <div className="flex w-max space-x-4 p-4">
-                          {procedure.images.map((img, idx) => (
-                            <div key={idx} className="relative shrink-0">
-                              <img 
-                                src={img} 
-                                alt={`Procedure ${idx + 1}`} 
-                                className="h-24 w-32 object-cover rounded border border-border"
-                              />
-                            </div>
-                          ))}
-                          {procedure.images.length > 4 && (
-                            <div className="flex items-center justify-center h-24 w-20 shrink-0 text-muted-foreground">
-                              <ChevronRight className="w-6 h-6" />
-                            </div>
-                          )}
+                      {/* make the images area responsive and horizontally scrollable to avoid page overflow */}
+                      <div className="w-full overflow-x-auto">
+                      {/* header with title and QC controls */}
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-foreground">Procedure Images:</p>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={(e) => { e.stopPropagation();
+                              const imgs = procedure.images || [];
+                              const statuses: Array<'good'|'warn'|'bad'> = imgs.map(() => {
+                                const r = Math.random();
+                                if (r < 0.5) return 'good';
+                                if (r < 0.8) return 'warn';
+                                return 'bad';
+                              });
+                              setQcMap((s) => ({ ...s, [procedure.id]: statuses }));
+                            }} onMouseDown={(e)=>e.stopPropagation()}>
+                            Quality control
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setShowAllMap((s) => ({ ...s, [procedure.id]: !s[procedure.id] })); }}>
+                            {showAllMap[procedure.id] ? 'Collapse' : 'Show all'}
+                          </Button>
                         </div>
-                        <ScrollBar orientation="horizontal" />
-                      </ScrollArea>
+                      </div>
+
+                      {/* If collapsed show horizontal scroll (max per row view), if expanded show grid with up to 7 cols */}
+                      {showAllMap[procedure.id] ? (
+                        /* expanded: render as horizontal grid (columns) that scrolls horizontally */
+                        <div className="inline-grid" style={{ display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(140px, 140px)', gap: 12 }}>
+                          {procedure.images.map((img, idx) => {
+                            const status = qcMap[procedure.id]?.[idx];
+                            const hasQc = (qcMap[procedure.id] || []).length > 0;
+                            const color = status === 'good' ? '#16a34a' : status === 'warn' ? '#f59e0b' : status === 'bad' ? '#dc2626' : 'var(--border)';
+                            const borderWidth = hasQc && status ? 4 : status ? 2 : 1;
+                            return (
+                              <div key={idx} className="" style={{ textAlign: 'center' }}>
+                                <img src={img} alt={`Procedure ${idx + 1}`} style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 6, border: `${borderWidth}px solid ${color}` }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+                          <div className="flex w-max space-x-4 p-4" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
+                            {procedure.images.map((img, idx) => {
+                              const status = qcMap[procedure.id]?.[idx];
+                              const hasQc = (qcMap[procedure.id] || []).length > 0;
+                              const color = status === 'good' ? '#16a34a' : status === 'warn' ? '#f59e0b' : status === 'bad' ? '#dc2626' : 'var(--border)';
+                              const borderWidth = hasQc && status ? 4 : status ? 2 : 1;
+                              return (
+                                <div key={idx} className="relative shrink-0">
+                                  <img 
+                                    src={img} 
+                                    alt={`Procedure ${idx + 1}`} 
+                                    className="object-cover rounded"
+                                    style={{ height: 110, width: 140, border: `${borderWidth}px solid ${color}` }}
+                                  />
+                                </div>
+                              );
+                            })}
+                            {procedure.images.length > 7 && (
+                              <div className="flex items-center justify-center h-24 w-20 shrink-0 text-muted-foreground">
+                                <ChevronRight className="w-6 h-6" />
+                              </div>
+                            )}
+                          </div>
+                          <ScrollBar orientation="horizontal" />
+                        </ScrollArea>
+                      )}
+                      </div>
                     </div>
                   )}
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation();
+                      // toggle QC: run random QC for this procedure
+                      const imgs = procedure.images || [];
+                      const statuses: Array<'good'|'warn'|'bad'> = imgs.map(() => {
+                        const r = Math.random();
+                        if (r < 0.5) return 'good';
+                        if (r < 0.8) return 'warn';
+                        return 'bad';
+                      });
+                      setQcMap((s) => ({ ...s, [procedure.id]: statuses }));
+                    }} className="mr-2" onMouseDown={(e)=>e.stopPropagation()}>
+                    Quality control
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setShowAllMap((s) => ({ ...s, [procedure.id]: !s[procedure.id] })); }} className="mr-2">
+                    {showAllMap[procedure.id] ? 'Collapse' : 'Show all'}
+                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button 
