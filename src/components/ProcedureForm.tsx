@@ -23,10 +23,28 @@ export const ProcedureForm = ({ onSubmit, onCancel }: ProcedureFormProps) => {
     duration: "",
     anesthesia: ""
   });
+  const [images, setImages] = useState<string[]>([]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const newImages: string[] = [];
+      Array.from(files).forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newImages.push(reader.result as string);
+          if (newImages.length === files.length) {
+            setImages([...images, ...newImages]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    onSubmit({ ...formData, images });
   };
 
   return (
@@ -146,6 +164,25 @@ export const ProcedureForm = ({ onSubmit, onCancel }: ProcedureFormProps) => {
           placeholder="Note any complications or adverse events..."
           className="min-h-[80px]"
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="images">Procedure Images (Optional)</Label>
+        <Input
+          id="images"
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleImageUpload}
+          className="cursor-pointer"
+        />
+        {images.length > 0 && (
+          <div className="flex gap-2 flex-wrap mt-2">
+            {images.map((img, idx) => (
+              <img key={idx} src={img} alt={`Procedure ${idx + 1}`} className="w-20 h-20 object-cover rounded border" />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 justify-end">

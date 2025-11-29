@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Search, Trash2, Calendar, User, Clock, FileText } from "lucide-react";
+import { Search, Trash2, Calendar, User, Clock, FileText, FileDown } from "lucide-react";
 import { Procedure } from "@/pages/Index";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,9 +21,10 @@ import {
 interface ProceduresListProps {
   procedures: Procedure[];
   onDelete: (id: string) => void;
+  onCreateReport: (procedure: Procedure) => void;
 }
 
-export const ProceduresList = ({ procedures, onDelete }: ProceduresListProps) => {
+export const ProceduresList = ({ procedures, onDelete, onCreateReport }: ProceduresListProps) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const filteredProcedures = procedures.filter(
@@ -97,14 +99,49 @@ export const ProceduresList = ({ procedures, onDelete }: ProceduresListProps) =>
                       <span>Anesthesia: {procedure.anesthesia}</span>
                     </div>
                   </div>
+
+                  {procedure.images && procedure.images.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-foreground mb-2">Procedure Images:</p>
+                      <Carousel className="w-full max-w-md">
+                        <CarouselContent>
+                          {procedure.images.map((img, idx) => (
+                            <CarouselItem key={idx} className="basis-1/4">
+                              <img 
+                                src={img} 
+                                alt={`Procedure ${idx + 1}`} 
+                                className="w-full h-24 object-cover rounded border border-border"
+                              />
+                            </CarouselItem>
+                          ))}
+                        </CarouselContent>
+                        {procedure.images.length > 4 && (
+                          <>
+                            <CarouselPrevious />
+                            <CarouselNext />
+                          </>
+                        )}
+                      </Carousel>
+                    </div>
+                  )}
                 </div>
 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </AlertDialogTrigger>
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => onCreateReport(procedure)}
+                    className="gap-2"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    Create Report
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Procedure</AlertDialogTitle>
@@ -119,7 +156,8 @@ export const ProceduresList = ({ procedures, onDelete }: ProceduresListProps) =>
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
-                </AlertDialog>
+                  </AlertDialog>
+                </div>
               </div>
             </Card>
           ))}
