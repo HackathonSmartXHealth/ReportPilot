@@ -5,6 +5,7 @@
   <p>Automated image/video triage, annotation, and report generation for post-operative review.</p>
 
   <img src="public/image.png" alt="QR — Open Repo/Demo" width="90" />
+  <a href="https://endo-log.lovable.app/" target="_blank" rel="noopener noreferrer" style="padding:6px 10px; border:1px solid #ccc; border-radius:6px; text-decoration:none; font-size:12px;">Open Demo</a>
 </div>
 
 
