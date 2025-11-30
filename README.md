@@ -6,11 +6,6 @@ Automated image/video triage, annotation, and report generation for post-operati
   <img src="public/image.png" alt="QR — Open Repo/Demo" width="140" />
 </p>
 
-## Quick Links
-- Samples: samples/
-- Architecture diagram: docs/architecture.png
-- Demo script: see “Demo Script (for judges)” below
-- QR code: see image above (public/image.png)
 
 ## Overview
 Surgical documentation is essential but time-consuming. ReportPilot uses AI/ML and agent workflows to:
