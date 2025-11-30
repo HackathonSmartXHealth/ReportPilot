@@ -1,0 +1,7 @@
+[submodule "scripts/AIDAqc"]
+	path = scripts/AIDAqc
+	url = git@github.com:Aswendt-Lab/AIDAqc.git
+	datalad-id = c5cac56e-5b3b-40c4-bc09-d009dfc86f91
+[submodule "scripts/Endo-FM"]
+	path = scripts/Endo-FM
+	url = git@github.com:med-air/Endo-FM.git
