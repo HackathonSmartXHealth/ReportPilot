@@ -1,10 +1,11 @@
 # ReportPilot — Agent-Validated Surgical Review
 Automated image/video triage, annotation, and report generation for post-operative review.
 
-<!-- QR code (renders on GitHub) -->
-<p align="right">
-  <img src="public/image.png" alt="QR — Open Repo/Demo" width="140" />
-</p>
+<div style="display:flex; align-items:center; justify-content:flex-end; gap:10px;">
+  <p>Your text goes here</p>
+
+  <img src="public/image.png" alt="QR — Open Repo/Demo" width="90" />
+</div>
 
 
 ## Overview
